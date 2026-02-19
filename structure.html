@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stella Matutina — Entity Structure</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #f7f5f0;
+    font-family: 'Courier New', Courier, monospace;
+    color: #111;
+    padding: 32px 20px 80px;
+    font-size: 13px;
+    line-height: 1.5;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .title {
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  hr { border: none; border-top: 1px solid #111; margin-bottom: 32px; }
+
+  /* NODE */
+  .node {
+    border: 1px solid #111;
+    padding: 14px 16px;
+    background: #f7f5f0;
+  }
+  .node.dashed { border-style: dashed; border-color: #aaa; }
+
+  .node-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 3px;
+  }
+  .node-name { font-size: 13px; font-weight: bold; margin-bottom: 10px; }
+
+  .field { border-top: 1px solid #e0ddd6; padding-top: 8px; margin-bottom: 8px; }
+  .field:last-child { margin-bottom: 0; }
+  .field-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: #888; margin-bottom: 3px; }
+  .field-body { font-size: 11.5px; color: #444; line-height: 1.6; }
+  .field-body.muted { color: #777; }
+
+  /* CONNECTOR — just an arrow */
+  .connector {
+    text-align: center;
+    padding: 8px 0;
+    font-size: 16px;
+    color: #aaa;
+    line-height: 1;
+  }
+  .connector.faint { color: #ccc; }
+
+  /* SEPARATOR */
+  .separator { border-top: 1px dashed #ccc; margin: 32px 0 16px; }
+  .sep-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: #888; margin-bottom: 12px; }
+
+  /* TERMS */
+  .term {
+    cursor: pointer;
+    border-bottom: 1px dashed #111;
+    color: inherit;
+    background: none;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+    display: inline;
+  }
+  .term:hover { background: rgba(0,0,0,0.06); }
+  .term.muted { border-bottom-color: #999; }
+
+  /* POPUP */
+  .popup-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .popup-overlay.active { display: flex; }
+  .popup {
+    background: #f7f5f0;
+    border: 1px solid #111;
+    padding: 24px;
+    max-width: 420px;
+    width: 100%;
+    position: relative;
+  }
+  .popup-term { font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: #888; margin-bottom: 4px; }
+  .popup-title { font-size: 13px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+  .popup-body { font-size: 12px; color: #444; line-height: 1.7; }
+  .popup-close { position: absolute; top: 12px; right: 14px; background: none; border: none; font-family: 'Courier New', monospace; font-size: 13px; cursor: pointer; color: #888; }
+  .popup-close:hover { color: #111; }
+</style>
+</head>
+<body>
+
+<div class="popup-overlay" id="overlay" onclick="closePopup(event)">
+  <div class="popup">
+    <button class="popup-close" onclick="closePopup()">✕</button>
+    <div class="popup-term" id="popup-term"></div>
+    <div class="popup-title" id="popup-title"></div>
+    <div class="popup-body" id="popup-body"></div>
+  </div>
+</div>
+
+<div class="title">Stella Matutina — Entity Structure</div>
+<hr>
+
+<!-- FRIENDS -->
+<div class="node">
+  <div class="node-label">United States</div>
+  <div class="node-name"><button class="term" onclick="showTerm('friends')">Friends of Stella Matutina</button> — 501(c)(3)</div>
+
+  <div class="field">
+    <div class="field-label">Role</div>
+    <div class="field-body">Receives US tax-deductible donations and grants them onward to the Swiss Foundation under IRS <button class="term" onclick="showTerm('expenditure')">expenditure responsibility</button> rules.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">Decisions</div>
+    <div class="field-body">Approves each grant to the Stiftung. Ensures funds are used for qualifying charitable purposes. Files annual <button class="term" onclick="showTerm('f990')">IRS Form 990</button>. Maintains records of expenditure.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">To establish</div>
+    <div class="field-body muted">Delaware incorporation · 3+ independent US directors · <button class="term muted" onclick="showTerm('f1023')">IRS Form 1023</button> · 9–12 months</div>
+  </div>
+</div>
+
+<div class="connector">↓</div>
+
+<!-- STIFTUNG -->
+<div class="node">
+  <div class="node-label">Switzerland — Core Entity</div>
+  <div class="node-name">Stella Matutina Stiftung</div>
+
+  <div class="field">
+    <div class="field-label">Role</div>
+    <div class="field-body">Holds the mission and charitable status. Employs staff, funds school operations, awards scholarships, builds the endowment, and <button class="term" onclick="showTerm('wholly')">wholly owns</button> the commercial subsidiary.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">Decisions</div>
+    <div class="field-body">Sets educational mission and curriculum. Hires and manages faculty and staff. Approves the annual budget. Governs the AG. Allocates endowment returns to operations and scholarships.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">To establish</div>
+    <div class="field-body muted"><button class="term muted" onclick="showTerm('charter')">Notarised founding charter</button> · Cantonal/federal registration · Swiss counsel · 2–3 months</div>
+  </div>
+</div>
+
+<div class="connector">↓</div>
+
+<!-- AG -->
+<div class="node">
+  <div class="node-label">Switzerland — Commercial</div>
+  <div class="node-name">Stella Matutina <button class="term" onclick="showTerm('ag')">AG</button></div>
+
+  <div class="field">
+    <div class="field-label">Role</div>
+    <div class="field-body">Takes equity stakes in companies and projects founded by students and faculty. Returns all profits to the Foundation's endowment. May act as GP to a future venture fund.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">Decisions</div>
+    <div class="field-body">Evaluates and approves equity investments. Manages relationships with portfolio ventures. Governs any future fund structure. Determines timing and size of distributions back to the Stiftung.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">To establish</div>
+    <div class="field-body muted">Notarised articles of association · Supervisory board appointment · Intercompany agreement with Stiftung · 1–2 weeks</div>
+  </div>
+</div>
+
+<div class="connector faint">↓</div>
+
+<!-- VENTURES -->
+<div class="node dashed">
+  <div class="node-label" style="color:#aaa;">Student &amp; Faculty Ventures</div>
+
+  <div class="field" style="border-top-color:#ebebeb;">
+    <div class="field-label" style="color:#aaa;">Role</div>
+    <div class="field-body" style="color:#888;">Companies and projects founded by Stella Matutina students and faculty. The AG holds minority equity stakes and receives a share of financial returns.</div>
+  </div>
+
+  <div class="field" style="border-top-color:#ebebeb;">
+    <div class="field-label" style="color:#aaa;">Decisions</div>
+    <div class="field-body" style="color:#888;">Independently run by their founders. Operate outside the Foundation's governance structure.</div>
+  </div>
+</div>
+
+<div class="connector faint">↓</div>
+
+<!-- ENDOWMENT -->
+<div class="node">
+  <div class="node-label">Endowment Pool</div>
+  <div class="node-name">Permanent capital base</div>
+
+  <div class="field">
+    <div class="field-label">Role</div>
+    <div class="field-body">Held and managed by the Stiftung. Grows through commercial returns and donations. Generates investment income that funds the school in perpetuity.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">Decisions</div>
+    <div class="field-body">The Stiftung board sets investment policy and approves annual distributions to cover operations and scholarships. Target: endowment large enough to make external fundraising optional.</div>
+  </div>
+</div>
+
+<!-- LAND -->
+<div class="separator"></div>
+<div class="sep-label">Separately — Real Estate</div>
+
+<div class="node">
+  <div class="node-label">Real Estate — Funder-Owned</div>
+  <div class="node-name">Land Holding Entity</div>
+
+  <div class="field">
+    <div class="field-label">Role</div>
+    <div class="field-body">Privately owned by funders. Legally separate from the charitable structure. Holds the school's premises and provides access to the Stiftung under a long-term lease.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">Decisions</div>
+    <div class="field-body">Funders determine the ownership vehicle. The critical decision for the school is securing a long-term, below-market lease with protections against sale or encumbrance without the Foundation's consent.</div>
+  </div>
+
+  <div class="field">
+    <div class="field-label">To establish</div>
+    <div class="field-body muted">Long-term lease agreement with Stiftung · Structure depends on funders' jurisdiction · Negotiated timeline</div>
+  </div>
+</div>
+
+<script>
+  const glossary = {
+    ag: {
+      term: "Swiss Company Law",
+      title: "Aktiengesellschaft (AG)",
+      body: "The AG is the Swiss joint stock company — equivalent to a corporation in the US or a PLC in the UK. It requires CHF 100,000 minimum share capital (vs CHF 20,000 for a GmbH), of which CHF 50,000 must be paid at formation. It has a mandatory supervisory board (Verwaltungsrat) separate from operational management, which gives the Stiftung a clean governance mechanism: it appoints the board, which in turn oversees management. The AG structure is more credible to external counterparties — portfolio companies, future LP investors — and its share structure is more flexible if the vehicle's role expands over time."
+    },
+    expenditure: {
+      term: "IRS Rule",
+      title: "Expenditure Responsibility",
+      body: "A mechanism under US tax law (IRC §4945) that allows a US public charity to make grants to foreign organisations while preserving the donor's tax deduction. The Friends org must document how every dollar is spent, obtain a written grant agreement specifying the charitable purpose, and file reports confirming the funds were used correctly. It is the legal bridge that makes American donations to a Swiss school tax-deductible."
+    },
+    friends: {
+      term: "Legal Structure",
+      title: "Friends of (Organisation)",
+      body: "A 'Friends of' organisation is a US 501(c)(3) public charity created specifically to receive American tax-deductible donations on behalf of a foreign institution. It has its own independent board, bank account, and legal identity. It does not control the foreign institution — it simply acts as a compliant US conduit, granting onward under IRS expenditure responsibility rules. Widely used by institutions such as the Tate, the Louvre, and Oxford University."
+    },
+    charter: {
+      term: "Swiss Foundation Law",
+      title: "Notarised Founding Charter",
+      body: "In Switzerland, a Stiftung is created by a founding act — the Stiftungsurkunde — which must be executed before a Swiss notary. This document defines the foundation's purpose, initial endowment, governance structure, and powers of the board of trustees. It is the constitution of the foundation and is extremely difficult to amend once registered, so it must be drafted with care. It is then filed with the cantonal Commercial Register to bring the foundation into legal existence."
+    },
+    wholly: {
+      term: "Structure",
+      title: "Why the Stiftung Wholly Owns the AG",
+      body: "If the AG were owned by individuals — including the founders — then commercial profits would flow to those individuals rather than to the school. This would mean philanthropic donations were effectively subsidising private enrichment, which undermines donor trust, jeopardises the Foundation's charitable status, and creates legal exposure under Swiss foundation law's prohibition on private benefit. By having the Stiftung own the AG entirely, all commercial upside belongs to the institution. Founders and staff are compensated at market rates for their work, but do not participate in equity returns."
+    },
+    f990: {
+      term: "US Tax Filing",
+      title: "IRS Form 990",
+      body: "The annual information return that US tax-exempt organisations must file with the IRS. It reports the organisation's finances, governance, programmes, and activities. Form 990 is a public document — anyone can view it — which means the Friends org's grants to the Stiftung, board composition, and compensation will be visible. This transparency is a feature, not a bug: it demonstrates to donors and regulators that the organisation is operating as a genuine charity."
+    },
+    f1023: {
+      term: "US Tax Filing",
+      title: "IRS Form 1023",
+      body: "The application for recognition of tax-exempt status under Section 501(c)(3) of the US Internal Revenue Code. Filing Form 1023 is how a newly incorporated nonprofit asks the IRS to officially recognise it as a public charity, making donations to it tax-deductible. The application requires a detailed description of the organisation's purpose, governance, finances, and — critically for the Friends org — its procedures for making grants to foreign organisations. Currently takes 9–12 months for the IRS to process."
+    }
+  };
+
+  function showTerm(key) {
+    const d = glossary[key];
+    document.getElementById('popup-term').textContent = d.term;
+    document.getElementById('popup-title').textContent = d.title;
+    document.getElementById('popup-body').textContent = d.body;
+    document.getElementById('overlay').classList.add('active');
+  }
+
+  function closePopup(e) {
+    if (!e || e.target === document.getElementById('overlay')) {
+      document.getElementById('overlay').classList.remove('active');
+    }
+  }
+</script>
+</body>
+</html>
