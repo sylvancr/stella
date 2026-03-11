@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stella Matutina — Territory Map</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #0D0D0D;
+    font-family: 'Courier New', Courier, monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 48px;
+    padding-bottom: calc(48px + env(safe-area-inset-bottom));
+    min-height: 100vh;
+    color: #CCC;
+  }
+  .header { width: 100%; max-width: 980px; margin-bottom: 14px; }
+  .eyebrow { font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: #555; margin-bottom: 5px; }
+  h1 { font-family: 'Arial Black', Arial, sans-serif; font-size: clamp(14px, 2.2vw, 21px); color: #EEE8DF; margin-bottom: 4px; }
+  .hint { font-size: 10px; color: #555; letter-spacing: 1px; }
+  .map-scroll {
+    width: 100%;
+    max-width: 980px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 4px;
+  }
+  svg { display: block; touch-action: pan-y; }
+  .legend {
+    width: 100%;
+    max-width: 980px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 28px;
+    margin-top: 12px;
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    align-items: center;
+  }
+  .leg-item { display: flex; align-items: center; gap: 8px; }
+  .leg-right { margin-left: auto; color: #444; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  @media (max-width: 640px) {
+    .leg-right { display: none; }
+    .hint-mobile { display: inline; }
+    .hint-desktop { display: none; }
+  }
+  @media (min-width: 641px) {
+    .hint-mobile { display: none; }
+    .hint-desktop { display: inline; }
+  }
+  .tooltip {
+    position: fixed;
+    background: #1C1C1C;
+    color: #DDD8CE;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    pointer-events: none;
+    display: none;
+    max-width: min(300px, calc(100vw - 24px));
+    line-height: 1.6;
+    z-index: 200;
+  }
+  .tooltip .tip-type {
+    font-size: 8.5px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  .tooltip .tip-type.entry { color: #3D8B6A; }
+  .tooltip .tip-type.exit  { color: #4A70A0; }
+  .tooltip .tip-nodes {
+    font-size: 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #555;
+    margin-top: 6px;
+  }
+  /* Tap-to-dismiss overlay for mobile tooltip */
+  .tip-dismiss {
+    display: none;
+    position: fixed; inset: 0;
+    z-index: 199;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <p class="eyebrow">Stella Matutina · Ecosystem</p>
+  <h1>Population–Program Verticals Map</h1>
+  <p class="hint">
+    <span class="hint-desktop">Click any node to highlight flows &nbsp;·&nbsp; hover a line to read it</span>
+    <span class="hint-mobile">Tap any node to highlight flows &nbsp;·&nbsp; tap a line to read it</span>
+  </p>
+</div>
+
+<div class="map-scroll">
+  <svg id="map" width="980" height="600" viewBox="0 0 980 600"></svg>
+</div>
+
+<div class="legend">
+  <div class="leg-item">
+    <svg width="32" height="10"><line x1="0" y1="5" x2="32" y2="5" stroke="#3D8B6A" stroke-width="2"/></svg>
+    Entry — attraction into vertical
+  </div>
+  <div class="leg-item">
+    <svg width="32" height="10"><line x1="0" y1="5" x2="32" y2="5" stroke="#4A70A0" stroke-width="2" stroke-dasharray="5,3"/></svg>
+    Exit — integration into vertical
+  </div>
+  <div class="leg-right">tap to lock · tap again to release</div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="tip-dismiss" id="tipDismiss"></div>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────
+
+const POPS = [
+  { id: 'students',  label: ['Students /', 'Fellows'],    cx: 78,  cy: 300, r: 44 },
+  { id: 'faculty',   label: ['Visiting', 'Faculty'],      cx: 490, cy: 62,  r: 44 },
+  { id: 'labstaff',  label: ['Lab Leads /', 'Staff'],     cx: 902, cy: 300, r: 44 },
+  { id: 'donors',    label: ['Donors'],                   cx: 790, cy: 528, r: 44 },
+  { id: 'local',     label: ['Local', 'Population'],      cx: 190, cy: 528, r: 44 },
+];
+
+const VERTS = [
+  { id: 'school',    label: 'SCHOOL',    cx: 290, cy: 205, r: 80, fill: '#2D6A4F', text: '#FFFFFF' },
+  { id: 'labs',      label: 'LABS',      cx: 680, cy: 205, r: 80, fill: '#7A3B1E', text: '#FFFFFF' },
+  { id: 'residency', label: 'RESIDENCY', cx: 290, cy: 420, r: 80, fill: '#1A3A5C', text: '#FFFFFF' },
+  { id: 'fund',      label: 'FUND',      cx: 680, cy: 420, r: 80, fill: '#4A2D5C', text: '#FFFFFF' },
+];
+
+// short: always-visible 1–2 word label on the line
+const CONNS = [
+  // Students / Fellows
+  { from:'students', to:'school',    type:'entry', short:'1–2yr curriculum',    label:'1–2 year curriculum' },
+  { from:'students', to:'labs',      type:'entry', short:'Lab internship',       label:'Working in existing lab; internships; proposing own lab' },
+  { from:'students', to:'residency', type:'entry', short:'Independent research', label:'Applications after residency; continuing independent research' },
+  { from:'students', to:'fund',      type:'entry', short:'Project funding',      label:'Projects funded during or following programme' },
+  { from:'students', to:'school',    type:'exit',  short:'Graduate to faculty',  label:'Graduation into faculty' },
+  { from:'students', to:'labs',      type:'exit',  short:'Direct hire',          label:'Hired into existing lab' },
+
+  // Visiting Faculty
+  { from:'faculty', to:'school',    type:'entry', short:'Teaching visit',      label:'1 day – 1 month teaching / facilitation' },
+  { from:'faculty', to:'labs',      type:'entry', short:'Own lab proposal',    label:'Working in existing lab; proposing own lab; hiring in' },
+  { from:'faculty', to:'residency', type:'entry', short:'Resident teaching',   label:'Optional teaching for residents; extended independent research' },
+  { from:'faculty', to:'fund',      type:'entry', short:'Funded modules',      label:'Funded module leads; selective project funding' },
+  { from:'faculty', to:'school',    type:'exit',  short:'Extended teaching',   label:'Extended teaching' },
+  { from:'faculty', to:'labs',      type:'exit',  short:'Direct hire',         label:'Hired into existing lab' },
+
+  // Lab Leads / Staff
+  { from:'labstaff', to:'school',    type:'entry', short:'Teach & hire',         label:'Opportunity to teach and hire talent' },
+  { from:'labstaff', to:'labs',      type:'entry', short:'Lab proposals',        label:'Call for proposals and associated funding' },
+  { from:'labstaff', to:'residency', type:'entry', short:'Practitioner hire',    label:'Work with practitioners; hiring or collaborations' },
+  { from:'labstaff', to:'fund',      type:'entry', short:'LP fundraise',         label:'Funding + scaling opportunity; attracting LPs; raising external funding' },
+  { from:'labstaff', to:'school',    type:'exit',  short:'Join as student',      label:'Becoming student / faculty' },
+  { from:'labstaff', to:'labs',      type:'exit',  short:'Ongoing alignment',    label:'Continued philosophical alignment and funding' },
+  { from:'labstaff', to:'residency', type:'exit',  short:'EAT engagement',       label:'EAT-style engagement' },
+
+  // Donors
+  { from:'donors', to:'school',    type:'entry', short:'Young philanthropists', label:'Recruiting young philanthropists / heirs' },
+  { from:'donors', to:'labs',      type:'entry', short:'Lab fundraising',       label:'Lab leads bringing existing funders; fundraising for labs' },
+  { from:'donors', to:'residency', type:'entry', short:'Patron showcase',       label:'Artists / researchers bringing existing patrons; showcasing talent in fundraising' },
+  { from:'donors', to:'fund',      type:'entry', short:'Becoming LPs',          label:'Supporting wider infrastructure; philanthropists becoming LPs' },
+  { from:'donors', to:'school',    type:'exit',  short:'Vision commitment',     label:'Commitment to vision' },
+
+  // Local Population
+  { from:'local', to:'school',    type:'entry', short:'Public lectures',    label:'Public lectures, workshops' },
+  { from:'local', to:'labs',      type:'entry', short:'Public labs',        label:'Public lectures, workshops' },
+  { from:'local', to:'residency', type:'entry', short:'Open workshops',     label:'Public lectures, workshops' },
+  { from:'local', to:'fund',      type:'entry', short:'Local fundraising',  label:'Investing in local causes; local fundraising' },
+  { from:'local', to:'school',    type:'exit',  short:'Local recruitment',  label:'Local recruitment' },
+  { from:'local', to:'labs',      type:'exit',  short:'Local recruitment',  label:'Local recruitment' },
+  { from:'local', to:'residency', type:'exit',  short:'Local recruitment',  label:'Local recruitment' },
+];
+
+// ── Constants ────────────────────────────────────────────────────
+const ENTRY_COLOR  = '#3D8B6A';
+const EXIT_COLOR   = '#4A70A0';
+const CURVE_OFFSET = 58;
+
+// ── SVG helpers ───────────────────────────────────────────────────
+const svg = document.getElementById('map');
+const ns  = 'http://www.w3.org/2000/svg';
+
+function el(tag, attrs = {}) {
+  const e = document.createElementNS(ns, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+function append(parent, child) { parent.appendChild(child); return child; }
+
+// ── Tooltip ───────────────────────────────────────────────────────
+const tipEl      = document.getElementById('tooltip');
+const tipDismiss = document.getElementById('tipDismiss');
+
+function positionTooltip(clientX, clientY) {
+  // Position above finger / cursor so hand doesn't cover it
+  requestAnimationFrame(() => {
+    const tw = tipEl.offsetWidth  || 220;
+    const th = tipEl.offsetHeight || 60;
+    const x  = Math.min(Math.max(clientX - tw / 2, 8), window.innerWidth - tw - 8);
+    const y  = Math.max(clientY - th - 16, 8);
+    tipEl.style.left = x + 'px';
+    tipEl.style.top  = y + 'px';
+  });
+}
+
+document.addEventListener('mousemove', e => {
+  if (tipEl.style.display === 'block') positionTooltip(e.clientX, e.clientY);
+});
+
+function formatLabel(label) {
+  if (!label.includes(';')) return label;
+  return label.split(';').map(s => {
+    const t = s.trim();
+    return '– ' + t.charAt(0).toUpperCase() + t.slice(1);
+  }).join('<br>');
+}
+
+function showTooltip(conn, clientX, clientY) {
+  const color  = conn.type === 'entry' ? ENTRY_COLOR : EXIT_COLOR;
+  const popLbl = POPS.find(p => p.id === conn.fromId)?.label.join(' ') ?? conn.fromId;
+  const vrtLbl = VERTS.find(v => v.id === conn.toId)?.label ?? conn.toId;
+  tipEl.innerHTML =
+    `<div class="tip-type ${conn.type}">${conn.type.toUpperCase()}</div>` +
+    formatLabel(conn.label) +
+    `<div class="tip-nodes">${popLbl} → ${vrtLbl}</div>`;
+  tipEl.style.borderColor = color;
+  tipEl.style.display = 'block';
+  if (clientX !== undefined) positionTooltip(clientX, clientY);
+  // Show dismiss overlay on touch devices
+  tipDismiss.style.display = 'block';
+}
+
+function hideTooltip() {
+  tipEl.style.display = 'none';
+  tipDismiss.style.display = 'none';
+}
+
+tipDismiss.addEventListener('touchstart', hideTooltip, { passive: true });
+tipDismiss.addEventListener('click', hideTooltip);
+
+// ── Defs (no arrowheads) ──────────────────────────────────────────
+function drawDefs() {
+  append(svg, el('defs')); // placeholder for any future defs
+}
+
+// ── Background ────────────────────────────────────────────────────
+function drawBackground() {
+  append(svg, el('rect', { width: 980, height: 600, fill: '#0D0D0D', rx: 4 }));
+  for (let x = 40; x < 980; x += 40)
+    for (let y = 40; y < 600; y += 40)
+      append(svg, el('circle', { cx: x, cy: y, r: 0.8, fill: '#222' }));
+  append(svg, el('text', {
+    x: 485, y: 318, fill: '#1A1A1A',
+    'font-family': 'Arial Black, Arial', 'font-size': 11,
+    'font-weight': 900, 'text-anchor': 'middle', 'letter-spacing': 6,
+  })).textContent = 'STELLA';
+}
+
+// ── Bezier path ───────────────────────────────────────────────────
+function bezierPath(fromNode, toNode, type) {
+  const dx = toNode.cx - fromNode.cx, dy = toNode.cy - fromNode.cy;
+  const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+  const sx = fromNode.cx + (dx/dist)*fromNode.r, sy = fromNode.cy + (dy/dist)*fromNode.r;
+  const ex = toNode.cx   - (dx/dist)*toNode.r,   ey = toNode.cy   - (dy/dist)*toNode.r;
+  const mx = (sx+ex)/2, my = (sy+ey)/2;
+  const px = -dy/dist,  py =  dx/dist;
+  const sign = type === 'entry' ? 1 : -1;
+  const cx = mx + sign*px*CURVE_OFFSET, cy = my + sign*py*CURVE_OFFSET;
+  // True visual midpoint at t=0.5
+  const lx = 0.25*sx + 0.5*cx + 0.25*ex;
+  const ly = 0.25*sy + 0.5*cy + 0.25*ey;
+  return {
+    d: `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`,
+    labelX: lx, labelY: ly,
+  };
+}
+
+// ── Connections + inline short labels ────────────────────────────
+const connEls = [];
+
+function drawConnections() {
+  const pathGroup  = append(svg, el('g', { id: 'conn-layer' }));
+  const labelGroup = append(svg, el('g', { id: 'label-layer' }));
+
+  CONNS.forEach(conn => {
+    const from = POPS.find(p => p.id === conn.from);
+    const to   = VERTS.find(v => v.id === conn.to);
+    const { d, labelX, labelY } = bezierPath(from, to, conn.type);
+    const color = conn.type === 'entry' ? ENTRY_COLOR : EXIT_COLOR;
+
+    // Visible stroke — no arrowheads
+    const path = el('path', {
+      d, fill: 'none', stroke: color,
+      'stroke-width': 1.5, 'stroke-opacity': 0.18,
+      'stroke-dasharray': conn.type === 'exit' ? '5,4' : 'none',
+      'pointer-events': 'none',
+    });
+    append(pathGroup, path);
+
+    // Short label group: dark halo + coloured text
+    const lblGrp = append(labelGroup, el('g', { opacity: 0.82, 'pointer-events': 'none' }));
+    const textAttrs = {
+      x: labelX.toFixed(1), y: labelY.toFixed(1),
+      'font-family': 'Courier New, monospace',
+      'font-size': 9,
+      'font-weight': 'bold',
+      'text-anchor': 'middle',
+      'dominant-baseline': 'middle',
+      'letter-spacing': 0.8,
+    };
+    const halo = el('text', { ...textAttrs, fill: 'none', stroke: '#0A0A0A', 'stroke-width': 4, 'stroke-linejoin': 'round' });
+    halo.textContent = conn.short;
+    append(lblGrp, halo);
+    const shortTxt = el('text', { ...textAttrs, fill: color });
+    shortTxt.textContent = conn.short;
+    append(lblGrp, shortTxt);
+
+    // Wide transparent hit target — works for both mouse and touch
+    const hit = el('path', { d, fill: 'none', stroke: 'transparent', 'stroke-width': 20 });
+    hit.style.cursor = 'pointer';
+    hit.style.touchAction = 'manipulation';
+    append(pathGroup, hit);
+
+    const entry = {
+      path, hit, lblGrp,
+      fromId: conn.from, toId: conn.to,
+      type: conn.type, label: conn.label,
+      dimmed: false,
+      _activeOpacity: 0.18, _activeWidth: 1.5,
+    };
+    connEls.push(entry);
+
+    // Mouse hover
+    hit.addEventListener('mouseenter', () => {
+      if (entry.dimmed) return;
+      path.setAttribute('stroke-opacity', 1.0);
+      path.setAttribute('stroke-width', 2.5);
+      showTooltip(entry);
+    });
+    hit.addEventListener('mouseleave', () => {
+      if (entry.dimmed) return;
+      path.setAttribute('stroke-opacity', entry._activeOpacity);
+      path.setAttribute('stroke-width',   entry._activeWidth);
+      hideTooltip();
+    });
+
+    // Touch tap — show tooltip above finger
+    hit.addEventListener('touchstart', e => {
+      if (entry.dimmed) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      path.setAttribute('stroke-opacity', 1.0);
+      path.setAttribute('stroke-width', 2.5);
+      showTooltip(entry, t.clientX, t.clientY);
+    }, { passive: false });
+    hit.addEventListener('touchend', () => {
+      if (entry.dimmed) return;
+      path.setAttribute('stroke-opacity', entry._activeOpacity);
+      path.setAttribute('stroke-width',   entry._activeWidth);
+    });
+  });
+}
+
+// ── Verticals ─────────────────────────────────────────────────────
+const vertEls = {};
+
+function drawVerticals() {
+  const g = append(svg, el('g', { id: 'vert-layer' }));
+  VERTS.forEach(v => {
+    const grp = append(g, el('g', { id: `vert-${v.id}` }));
+    grp.style.cursor = 'pointer';
+    grp.style.touchAction = 'manipulation';
+    append(grp, el('circle', { cx:v.cx, cy:v.cy, r:v.r+10, fill:'none', stroke:v.fill, 'stroke-width':1, 'stroke-opacity':0.25 }));
+    append(grp, el('circle', { cx:v.cx, cy:v.cy, r:v.r, fill:v.fill, stroke:v.fill, 'stroke-width':2 }));
+    append(grp, el('text', {
+      x:v.cx, y:v.cy+4, fill:v.text,
+      'font-family':'Arial Black, Arial',
+      'font-size': v.label === 'RESIDENCY' ? 10.5 : 12.5,
+      'font-weight':900, 'text-anchor':'middle', 'letter-spacing':2, 'pointer-events':'none',
+    })).textContent = v.label;
+    vertEls[v.id] = grp;
+    grp.addEventListener('mouseenter', () => { if (!locked) applyHighlight('vert', v.id); });
+    grp.addEventListener('mouseleave', () => { if (!locked) resetHighlight(); });
+    grp.addEventListener('click',      () => lockToggle('vert', v.id));
+  });
+}
+
+// ── Populations ───────────────────────────────────────────────────
+const popEls = {};
+
+function drawPopulations() {
+  const g = append(svg, el('g', { id: 'pop-layer' }));
+  POPS.forEach(p => {
+    const grp = append(g, el('g', { id:`pop-${p.id}` }));
+    grp.style.cursor = 'pointer';
+    grp.style.touchAction = 'manipulation';
+    append(grp, el('circle', { cx:p.cx, cy:p.cy, r:p.r, fill:'#1E1E1E', stroke:'#555', 'stroke-width':1.5 }));
+    p.label.forEach((line, i) => {
+      const off = p.label.length === 1 ? 0 : (i - (p.label.length-1)/2) * 13;
+      append(grp, el('text', {
+        x:p.cx, y:p.cy+off+4, fill:'#CCC',
+        'font-family':'Courier New, monospace', 'font-size':9.5,
+        'font-weight':'bold', 'text-anchor':'middle', 'pointer-events':'none', 'letter-spacing':0.5,
+      })).textContent = line;
+    });
+    popEls[p.id] = grp;
+    grp.addEventListener('mouseenter', () => { if (!locked) applyHighlight('pop', p.id); });
+    grp.addEventListener('mouseleave', () => { if (!locked) resetHighlight(); });
+    grp.addEventListener('click',      () => lockToggle('pop', p.id));
+  });
+}
+
+// ── Interaction ───────────────────────────────────────────────────
+let locked = null;
+
+function lockToggle(kind, id) {
+  if (locked && locked.kind === kind && locked.id === id) {
+    locked = null; resetHighlight();
+  } else {
+    locked = { kind, id }; applyHighlight(kind, id);
+  }
+}
+
+function applyHighlight(kind, id) {
+  connEls.forEach(c => {
+    const active = kind === 'pop' ? c.fromId === id : c.toId === id;
+    c.dimmed = !active;
+    if (active) {
+      c._activeOpacity = 0.85;
+      c._activeWidth   = 2.0;
+      c.path.setAttribute('stroke-opacity', 0.85);
+      c.path.setAttribute('stroke-width',   2.0);
+      c.lblGrp.setAttribute('opacity', 1.0);
+      c.hit.style.pointerEvents = 'auto';
+    } else {
+      c.path.setAttribute('stroke-opacity', 0.0);
+      c.path.setAttribute('stroke-width',   1.0);
+      c.lblGrp.setAttribute('opacity', 0);
+      c.hit.style.pointerEvents = 'none';
+    }
+  });
+  POPS.forEach(p => {
+    const active = kind === 'pop'
+      ? p.id === id
+      : connEls.some(c => c.toId === id && c.fromId === p.id);
+    popEls[p.id].style.opacity = active ? 1 : 0.15;
+  });
+  VERTS.forEach(v => {
+    const active = kind === 'vert'
+      ? v.id === id
+      : connEls.some(c => c.fromId === id && c.toId === v.id);
+    vertEls[v.id].style.opacity = active ? 1 : 0.12;
+  });
+}
+
+function resetHighlight() {
+  hideTooltip();
+  connEls.forEach(c => {
+    c.dimmed = false;
+    c._activeOpacity = 0.18;
+    c._activeWidth   = 1.5;
+    c.path.setAttribute('stroke-opacity', 0.18);
+    c.path.setAttribute('stroke-width',   1.5);
+    c.lblGrp.setAttribute('opacity', 0.82);
+    c.hit.style.pointerEvents = 'auto';
+  });
+  POPS.forEach(p  => { popEls[p.id].style.opacity  = 1; });
+  VERTS.forEach(v => { vertEls[v.id].style.opacity = 1; });
+}
+
+// Tap outside nodes/paths on mobile to deselect
+svg.addEventListener('touchstart', e => {
+  if (locked && !e.target.closest('#vert-layer, #pop-layer, #conn-layer')) {
+    locked = null; resetHighlight();
+  }
+}, { passive: true });
+
+// ── Init ──────────────────────────────────────────────────────────
+drawDefs();
+drawBackground();
+drawConnections();
+drawVerticals();
+drawPopulations();
+</script>
+</body>
+</html>
