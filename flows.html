@@ -6,53 +6,63 @@
 <title>Stella Matutina — Territory Map</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
   body {
     background: #0D0D0D;
     font-family: 'Courier New', Courier, monospace;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    padding: 28px 16px 48px;
-    padding-bottom: calc(48px + env(safe-area-inset-bottom));
-    min-height: 100vh;
+    min-height: 100%;
     color: #CCC;
   }
-  .header { width: 100%; max-width: 980px; margin-bottom: 14px; }
-  .eyebrow { font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: #555; margin-bottom: 5px; }
-  h1 { font-family: 'Arial Black', Arial, sans-serif; font-size: clamp(14px, 2.2vw, 21px); color: #EEE8DF; margin-bottom: 4px; }
-  .hint { font-size: 10px; color: #555; letter-spacing: 1px; }
-  .map-scroll {
-    width: 100%;
-    max-width: 980px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border-radius: 4px;
+
+  /* ── Header ─────────────────────────────────── */
+  .header {
+    padding: 20px 20px 10px;
+    flex-shrink: 0;
   }
-  svg { display: block; touch-action: pan-y; }
-  .legend {
+  .eyebrow { font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: #555; margin-bottom: 4px; }
+  h1 { font-family: 'Arial Black', Arial, sans-serif; font-size: clamp(13px, 2vw, 19px); color: #EEE8DF; margin-bottom: 3px; line-height: 1.2; }
+  .hint { font-size: 10px; color: #444; letter-spacing: 0.5px; }
+
+  /* ── Map: takes all remaining vertical space ─── */
+  .map-wrap {
+    flex: 1 1 auto;
+    position: relative;
+    overflow: hidden;
+    /* touch-action: none tells the browser we handle all touch ourselves */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    min-height: 0;
+  }
+  #map {
     width: 100%;
-    max-width: 980px;
+    height: 100%;
+    display: block;
+    /* cursor changes when panning */
+  }
+  #map.panning { cursor: grab; }
+
+  /* ── Legend ──────────────────────────────────── */
+  .legend {
+    padding: 10px 20px 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
     display: flex;
     flex-wrap: wrap;
-    gap: 16px 28px;
-    margin-top: 12px;
+    gap: 10px 24px;
     font-size: 10px;
     color: #555;
     letter-spacing: 1px;
     text-transform: uppercase;
     align-items: center;
+    flex-shrink: 0;
   }
   .leg-item { display: flex; align-items: center; gap: 8px; }
-  .leg-right { margin-left: auto; color: #444; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
-  @media (max-width: 640px) {
-    .leg-right { display: none; }
-    .hint-mobile { display: inline; }
-    .hint-desktop { display: none; }
-  }
-  @media (min-width: 641px) {
-    .hint-mobile { display: none; }
-    .hint-desktop { display: inline; }
-  }
+  .leg-right { margin-left: auto; color: #383838; font-size: 9px; }
+  @media (max-width: 640px) { .leg-right { display: none; } }
+
+  /* ── Tooltip ─────────────────────────────────── */
   .tooltip {
     position: fixed;
     background: #1C1C1C;
@@ -66,30 +76,36 @@
     display: none;
     max-width: min(300px, calc(100vw - 24px));
     line-height: 1.6;
-    z-index: 200;
+    z-index: 300;
   }
   .tooltip .tip-type {
-    font-size: 8.5px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 5px;
-    font-weight: bold;
+    font-size: 8.5px; letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 5px; font-weight: bold;
   }
   .tooltip .tip-type.entry { color: #3D8B6A; }
   .tooltip .tip-type.exit  { color: #4A70A0; }
   .tooltip .tip-nodes {
-    font-size: 8px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: #555;
-    margin-top: 6px;
+    font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+    color: #555; margin-top: 6px;
   }
-  /* Tap-to-dismiss overlay for mobile tooltip */
+
+  /* ── Tap-outside dismiss (mobile tooltip) ─────── */
   .tip-dismiss {
-    display: none;
-    position: fixed; inset: 0;
-    z-index: 199;
+    display: none; position: fixed; inset: 0; z-index: 299;
   }
+
+  /* ── Reset zoom button (shows when zoomed) ──── */
+  .zoom-reset {
+    display: none;
+    position: absolute; bottom: 16px; right: 16px;
+    background: #222; border: 1px solid #444; color: #888;
+    font-family: 'Courier New', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 7px 11px; border-radius: 3px;
+    cursor: pointer; z-index: 10;
+    -webkit-appearance: none;
+  }
+  .zoom-reset:active { background: #2A2A2A; }
 </style>
 </head>
 <body>
@@ -97,26 +113,24 @@
 <div class="header">
   <p class="eyebrow">Stella Matutina · Ecosystem</p>
   <h1>Population–Program Verticals Map</h1>
-  <p class="hint">
-    <span class="hint-desktop">Click any node to highlight flows &nbsp;·&nbsp; hover a line to read it</span>
-    <span class="hint-mobile">Tap any node to highlight flows &nbsp;·&nbsp; tap a line to read it</span>
-  </p>
+  <p class="hint" id="hint">Click any node · hover a line to read it</p>
 </div>
 
-<div class="map-scroll">
-  <svg id="map" width="980" height="600" viewBox="0 0 980 600"></svg>
+<div class="map-wrap" id="mapWrap">
+  <svg id="map" viewBox="0 0 980 600" preserveAspectRatio="xMidYMid meet"></svg>
+  <button class="zoom-reset" id="zoomReset" aria-label="Reset zoom">Reset zoom</button>
 </div>
 
 <div class="legend">
   <div class="leg-item">
-    <svg width="32" height="10"><line x1="0" y1="5" x2="32" y2="5" stroke="#3D8B6A" stroke-width="2"/></svg>
-    Entry — attraction into vertical
+    <svg width="28" height="10"><line x1="0" y1="5" x2="28" y2="5" stroke="#3D8B6A" stroke-width="2"/></svg>
+    Entry
   </div>
   <div class="leg-item">
-    <svg width="32" height="10"><line x1="0" y1="5" x2="32" y2="5" stroke="#4A70A0" stroke-width="2" stroke-dasharray="5,3"/></svg>
-    Exit — integration into vertical
+    <svg width="28" height="10"><line x1="0" y1="5" x2="28" y2="5" stroke="#4A70A0" stroke-width="2" stroke-dasharray="5,3"/></svg>
+    Exit
   </div>
-  <div class="leg-right">tap to lock · tap again to release</div>
+  <div class="leg-right">click to lock · click again to release</div>
 </div>
 
 <div class="tooltip" id="tooltip"></div>
@@ -140,7 +154,6 @@ const VERTS = [
   { id: 'fund',      label: 'FUND',      cx: 680, cy: 420, r: 80, fill: '#4A2D5C', text: '#FFFFFF' },
 ];
 
-// short: always-visible 1–2 word label on the line
 const CONNS = [
   // Students / Fellows
   { from:'students', to:'school',    type:'entry', short:'1–2yr curriculum',    label:'1–2 year curriculum' },
@@ -149,7 +162,6 @@ const CONNS = [
   { from:'students', to:'fund',      type:'entry', short:'Project funding',      label:'Projects funded during or following programme' },
   { from:'students', to:'school',    type:'exit',  short:'Graduate to faculty',  label:'Graduation into faculty' },
   { from:'students', to:'labs',      type:'exit',  short:'Direct hire',          label:'Hired into existing lab' },
-
   // Visiting Faculty
   { from:'faculty', to:'school',    type:'entry', short:'Teaching visit',      label:'1 day – 1 month teaching / facilitation' },
   { from:'faculty', to:'labs',      type:'entry', short:'Own lab proposal',    label:'Working in existing lab; proposing own lab; hiring in' },
@@ -157,7 +169,6 @@ const CONNS = [
   { from:'faculty', to:'fund',      type:'entry', short:'Funded modules',      label:'Funded module leads; selective project funding' },
   { from:'faculty', to:'school',    type:'exit',  short:'Extended teaching',   label:'Extended teaching' },
   { from:'faculty', to:'labs',      type:'exit',  short:'Direct hire',         label:'Hired into existing lab' },
-
   // Lab Leads / Staff
   { from:'labstaff', to:'school',    type:'entry', short:'Teach & hire',         label:'Opportunity to teach and hire talent' },
   { from:'labstaff', to:'labs',      type:'entry', short:'Lab proposals',        label:'Call for proposals and associated funding' },
@@ -166,14 +177,12 @@ const CONNS = [
   { from:'labstaff', to:'school',    type:'exit',  short:'Join as student',      label:'Becoming student / faculty' },
   { from:'labstaff', to:'labs',      type:'exit',  short:'Ongoing alignment',    label:'Continued philosophical alignment and funding' },
   { from:'labstaff', to:'residency', type:'exit',  short:'EAT engagement',       label:'EAT-style engagement' },
-
   // Donors
   { from:'donors', to:'school',    type:'entry', short:'Young philanthropists', label:'Recruiting young philanthropists / heirs' },
   { from:'donors', to:'labs',      type:'entry', short:'Lab fundraising',       label:'Lab leads bringing existing funders; fundraising for labs' },
   { from:'donors', to:'residency', type:'entry', short:'Patron showcase',       label:'Artists / researchers bringing existing patrons; showcasing talent in fundraising' },
   { from:'donors', to:'fund',      type:'entry', short:'Becoming LPs',          label:'Supporting wider infrastructure; philanthropists becoming LPs' },
   { from:'donors', to:'school',    type:'exit',  short:'Vision commitment',     label:'Commitment to vision' },
-
   // Local Population
   { from:'local', to:'school',    type:'entry', short:'Public lectures',    label:'Public lectures, workshops' },
   { from:'local', to:'labs',      type:'entry', short:'Public labs',        label:'Public lectures, workshops' },
@@ -184,14 +193,14 @@ const CONNS = [
   { from:'local', to:'residency', type:'exit',  short:'Local recruitment',  label:'Local recruitment' },
 ];
 
-// ── Constants ────────────────────────────────────────────────────
 const ENTRY_COLOR  = '#3D8B6A';
 const EXIT_COLOR   = '#4A70A0';
 const CURVE_OFFSET = 58;
 
 // ── SVG helpers ───────────────────────────────────────────────────
-const svg = document.getElementById('map');
-const ns  = 'http://www.w3.org/2000/svg';
+const svg     = document.getElementById('map');
+const mapWrap = document.getElementById('mapWrap');
+const ns      = 'http://www.w3.org/2000/svg';
 
 function el(tag, attrs = {}) {
   const e = document.createElementNS(ns, tag);
@@ -200,19 +209,146 @@ function el(tag, attrs = {}) {
 }
 function append(parent, child) { parent.appendChild(child); return child; }
 
+// ── ViewBox / zoom state ──────────────────────────────────────────
+const VB_ORIG = { x: 0, y: 0, w: 980, h: 600 };
+const vb = { ...VB_ORIG };
+const VB_MIN_W = 180;
+
+function applyVB() {
+  svg.setAttribute('viewBox', `${vb.x.toFixed(2)} ${vb.y.toFixed(2)} ${vb.w.toFixed(2)} ${vb.h.toFixed(2)}`);
+  const zoomed = vb.w < VB_ORIG.w - 10;
+  zoomResetBtn.style.display = zoomed ? 'block' : 'none';
+}
+
+function clampVB() {
+  vb.w = Math.max(VB_MIN_W, Math.min(VB_ORIG.w, vb.w));
+  vb.h = vb.w * VB_ORIG.h / VB_ORIG.w;
+  vb.x = Math.max(-80, Math.min(vb.x, VB_ORIG.w - vb.w + 80));
+  vb.y = Math.max(-50, Math.min(vb.y, VB_ORIG.h - vb.h + 50));
+}
+
+function clientToSVG(cx, cy) {
+  const r = svg.getBoundingClientRect();
+  return {
+    x: vb.x + (cx - r.left) / r.width  * vb.w,
+    y: vb.y + (cy - r.top)  / r.height * vb.h,
+  };
+}
+
+// ── Zoom reset ─────────────────────────────────────────────────────
+const zoomResetBtn = document.getElementById('zoomReset');
+zoomResetBtn.addEventListener('click',      resetZoom);
+zoomResetBtn.addEventListener('touchstart', resetZoom, { passive: true });
+function resetZoom() { Object.assign(vb, VB_ORIG); applyVB(); }
+
+// ── Touch gestures: pinch-to-zoom + single-finger pan ─────────────
+let pinch = null; // { dist, midClient, vbSnap }
+let pan   = null; // { startClient, vbSnap, moved }
+
+mapWrap.addEventListener('touchstart', onTouchStart, { passive: false });
+mapWrap.addEventListener('touchmove',  onTouchMove,  { passive: false });
+mapWrap.addEventListener('touchend',   onTouchEnd,   { passive: true  });
+
+function pinchDist(t1, t2) {
+  return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+}
+function pinchMid(t1, t2) {
+  return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+}
+
+function onTouchStart(e) {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    pan = null;
+    pinch = {
+      dist:     pinchDist(e.touches[0], e.touches[1]),
+      midCl:    pinchMid(e.touches[0], e.touches[1]),
+      vbSnap:   { ...vb },
+    };
+  } else if (e.touches.length === 1) {
+    pan = {
+      startCl: { x: e.touches[0].clientX, y: e.touches[0].clientY },
+      vbSnap:  { ...vb },
+      moved:   false,
+    };
+  }
+}
+
+function onTouchMove(e) {
+  if (e.touches.length === 2 && pinch) {
+    e.preventDefault();
+    const newDist = pinchDist(e.touches[0], e.touches[1]);
+    const newMid  = pinchMid(e.touches[0], e.touches[1]);
+
+    // Zoom around the initial pinch midpoint in SVG coords
+    const origin   = clientToSVG(pinch.midCl.x, pinch.midCl.y);
+    const zoomFact = pinch.dist / newDist;
+    const newW     = pinch.vbSnap.w * zoomFact;
+    const newH     = newW * VB_ORIG.h / VB_ORIG.w;
+    vb.w = newW;
+    vb.h = newH;
+    vb.x = origin.x - (origin.x - pinch.vbSnap.x) * (newW / pinch.vbSnap.w);
+    vb.y = origin.y - (origin.y - pinch.vbSnap.y) * (newH / pinch.vbSnap.h);
+
+    // Also translate with pinch midpoint movement
+    const r = svg.getBoundingClientRect();
+    vb.x += (pinch.midCl.x - newMid.x) * vb.w / r.width;
+    vb.y += (pinch.midCl.y - newMid.y) * vb.h / r.height;
+
+    clampVB(); applyVB();
+
+  } else if (e.touches.length === 1 && pan) {
+    const touch = e.touches[0];
+    const dx = touch.clientX - pan.startCl.x;
+    const dy = touch.clientY - pan.startCl.y;
+
+    if (Math.hypot(dx, dy) > 6) pan.moved = true;
+
+    // Only pan when zoomed in, to allow page scroll otherwise
+    if (pan.moved && vb.w < VB_ORIG.w - 10) {
+      e.preventDefault();
+      const r = svg.getBoundingClientRect();
+      vb.x = pan.vbSnap.x - dx * vb.w / r.width;
+      vb.y = pan.vbSnap.y - dy * vb.h / r.height;
+      clampVB(); applyVB();
+    }
+  }
+}
+
+function onTouchEnd(e) {
+  if (e.touches.length < 2) pinch = null;
+  if (e.touches.length === 0) {
+    // Double-tap to reset zoom
+    const now = Date.now();
+    if (now - (mapWrap._lastTap || 0) < 280 && !pan?.moved) {
+      resetZoom();
+    }
+    mapWrap._lastTap = now;
+    pan = null;
+  }
+}
+
+// Mouse-wheel zoom (desktop)
+mapWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY > 0 ? 1.12 : 0.89;
+  const origin = clientToSVG(e.clientX, e.clientY);
+  vb.w *= factor; vb.h = vb.w * VB_ORIG.h / VB_ORIG.w;
+  vb.x  = origin.x - (origin.x - vb.x) * factor;
+  vb.y  = origin.y - (origin.y - vb.y) * factor;
+  clampVB(); applyVB();
+}, { passive: false });
+
 // ── Tooltip ───────────────────────────────────────────────────────
 const tipEl      = document.getElementById('tooltip');
 const tipDismiss = document.getElementById('tipDismiss');
 
 function positionTooltip(clientX, clientY) {
-  // Position above finger / cursor so hand doesn't cover it
   requestAnimationFrame(() => {
     const tw = tipEl.offsetWidth  || 220;
     const th = tipEl.offsetHeight || 60;
-    const x  = Math.min(Math.max(clientX - tw / 2, 8), window.innerWidth - tw - 8);
-    const y  = Math.max(clientY - th - 16, 8);
-    tipEl.style.left = x + 'px';
-    tipEl.style.top  = y + 'px';
+    tipEl.style.left = Math.min(Math.max(clientX - tw / 2, 8), window.innerWidth  - tw - 8) + 'px';
+    tipEl.style.top  = Math.max(clientY - th - 18, 8) + 'px';
   });
 }
 
@@ -221,11 +357,14 @@ document.addEventListener('mousemove', e => {
 });
 
 function formatLabel(label) {
-  if (!label.includes(';')) return label;
-  return label.split(';').map(s => {
-    const t = s.trim();
-    return '– ' + t.charAt(0).toUpperCase() + t.slice(1);
-  }).join('<br>');
+  if (!label.includes(';') && !label.includes(',')) return label;
+  if (label.includes(';')) {
+    return label.split(';').map(s => {
+      const t = s.trim();
+      return '– ' + t.charAt(0).toUpperCase() + t.slice(1);
+    }).join('<br>');
+  }
+  return label;
 }
 
 function showTooltip(conn, clientX, clientY) {
@@ -239,22 +378,16 @@ function showTooltip(conn, clientX, clientY) {
   tipEl.style.borderColor = color;
   tipEl.style.display = 'block';
   if (clientX !== undefined) positionTooltip(clientX, clientY);
-  // Show dismiss overlay on touch devices
   tipDismiss.style.display = 'block';
 }
 
 function hideTooltip() {
-  tipEl.style.display = 'none';
+  tipEl.style.display     = 'none';
   tipDismiss.style.display = 'none';
 }
 
 tipDismiss.addEventListener('touchstart', hideTooltip, { passive: true });
-tipDismiss.addEventListener('click', hideTooltip);
-
-// ── Defs (no arrowheads) ──────────────────────────────────────────
-function drawDefs() {
-  append(svg, el('defs')); // placeholder for any future defs
-}
+tipDismiss.addEventListener('click',      hideTooltip);
 
 // ── Background ────────────────────────────────────────────────────
 function drawBackground() {
@@ -276,10 +409,9 @@ function bezierPath(fromNode, toNode, type) {
   const sx = fromNode.cx + (dx/dist)*fromNode.r, sy = fromNode.cy + (dy/dist)*fromNode.r;
   const ex = toNode.cx   - (dx/dist)*toNode.r,   ey = toNode.cy   - (dy/dist)*toNode.r;
   const mx = (sx+ex)/2, my = (sy+ey)/2;
-  const px = -dy/dist,  py =  dx/dist;
+  const px = -dy/dist, py = dx/dist;
   const sign = type === 'entry' ? 1 : -1;
   const cx = mx + sign*px*CURVE_OFFSET, cy = my + sign*py*CURVE_OFFSET;
-  // True visual midpoint at t=0.5
   const lx = 0.25*sx + 0.5*cx + 0.25*ex;
   const ly = 0.25*sy + 0.5*cy + 0.25*ey;
   return {
@@ -288,12 +420,12 @@ function bezierPath(fromNode, toNode, type) {
   };
 }
 
-// ── Connections + inline short labels ────────────────────────────
+// ── Connections ───────────────────────────────────────────────────
 const connEls = [];
 
 function drawConnections() {
-  const pathGroup  = append(svg, el('g', { id: 'conn-layer' }));
-  const labelGroup = append(svg, el('g', { id: 'label-layer' }));
+  const pathLayer  = append(svg, el('g'));
+  const labelLayer = append(svg, el('g'));
 
   CONNS.forEach(conn => {
     const from = POPS.find(p => p.id === conn.from);
@@ -301,45 +433,39 @@ function drawConnections() {
     const { d, labelX, labelY } = bezierPath(from, to, conn.type);
     const color = conn.type === 'entry' ? ENTRY_COLOR : EXIT_COLOR;
 
-    // Visible stroke — no arrowheads
     const path = el('path', {
       d, fill: 'none', stroke: color,
       'stroke-width': 1.5, 'stroke-opacity': 0.18,
       'stroke-dasharray': conn.type === 'exit' ? '5,4' : 'none',
       'pointer-events': 'none',
     });
-    append(pathGroup, path);
+    append(pathLayer, path);
 
-    // Short label group: dark halo + coloured text
-    const lblGrp = append(labelGroup, el('g', { opacity: 0.82, 'pointer-events': 'none' }));
-    const textAttrs = {
+    // Short label: halo + coloured text
+    const lblGrp = append(labelLayer, el('g', { opacity: 0.82, 'pointer-events': 'none' }));
+    const ta = {
       x: labelX.toFixed(1), y: labelY.toFixed(1),
-      'font-family': 'Courier New, monospace',
-      'font-size': 9,
-      'font-weight': 'bold',
-      'text-anchor': 'middle',
-      'dominant-baseline': 'middle',
-      'letter-spacing': 0.8,
+      'font-family': 'Courier New, monospace', 'font-size': 9,
+      'font-weight': 'bold', 'text-anchor': 'middle',
+      'dominant-baseline': 'middle', 'letter-spacing': 0.8,
     };
-    const halo = el('text', { ...textAttrs, fill: 'none', stroke: '#0A0A0A', 'stroke-width': 4, 'stroke-linejoin': 'round' });
+    const halo = el('text', { ...ta, fill: 'none', stroke: '#0A0A0A', 'stroke-width': 4, 'stroke-linejoin': 'round' });
     halo.textContent = conn.short;
     append(lblGrp, halo);
-    const shortTxt = el('text', { ...textAttrs, fill: color });
-    shortTxt.textContent = conn.short;
-    append(lblGrp, shortTxt);
+    const lbl = el('text', { ...ta, fill: color });
+    lbl.textContent = conn.short;
+    append(lblGrp, lbl);
 
-    // Wide transparent hit target — works for both mouse and touch
+    // Hit target (wider invisible stroke)
     const hit = el('path', { d, fill: 'none', stroke: 'transparent', 'stroke-width': 20 });
     hit.style.cursor = 'pointer';
-    hit.style.touchAction = 'manipulation';
-    append(pathGroup, hit);
+    append(pathLayer, hit);
 
     const entry = {
       path, hit, lblGrp,
       fromId: conn.from, toId: conn.to,
       type: conn.type, label: conn.label,
-      dimmed: false,
-      _activeOpacity: 0.18, _activeWidth: 1.5,
+      dimmed: false, _ao: 0.18, _aw: 1.5,
     };
     connEls.push(entry);
 
@@ -347,30 +473,32 @@ function drawConnections() {
     hit.addEventListener('mouseenter', () => {
       if (entry.dimmed) return;
       path.setAttribute('stroke-opacity', 1.0);
-      path.setAttribute('stroke-width', 2.5);
+      path.setAttribute('stroke-width',   2.5);
       showTooltip(entry);
     });
     hit.addEventListener('mouseleave', () => {
       if (entry.dimmed) return;
-      path.setAttribute('stroke-opacity', entry._activeOpacity);
-      path.setAttribute('stroke-width',   entry._activeWidth);
+      path.setAttribute('stroke-opacity', entry._ao);
+      path.setAttribute('stroke-width',   entry._aw);
       hideTooltip();
     });
 
-    // Touch tap — show tooltip above finger
+    // Touch tap on path (show tooltip above finger)
     hit.addEventListener('touchstart', e => {
-      if (entry.dimmed) return;
-      e.preventDefault();
-      const t = e.touches[0];
+      if (entry.dimmed || pan?.moved || pinch) return;
+      e.stopPropagation();
+      const t = e.changedTouches[0];
       path.setAttribute('stroke-opacity', 1.0);
-      path.setAttribute('stroke-width', 2.5);
+      path.setAttribute('stroke-width',   2.5);
       showTooltip(entry, t.clientX, t.clientY);
-    }, { passive: false });
+    }, { passive: true });
     hit.addEventListener('touchend', () => {
       if (entry.dimmed) return;
-      path.setAttribute('stroke-opacity', entry._activeOpacity);
-      path.setAttribute('stroke-width',   entry._activeWidth);
-    });
+      setTimeout(() => {
+        path.setAttribute('stroke-opacity', entry._ao);
+        path.setAttribute('stroke-width',   entry._aw);
+      }, 1800);
+    }, { passive: true });
   });
 }
 
@@ -378,11 +506,10 @@ function drawConnections() {
 const vertEls = {};
 
 function drawVerticals() {
-  const g = append(svg, el('g', { id: 'vert-layer' }));
+  const g = append(svg, el('g'));
   VERTS.forEach(v => {
-    const grp = append(g, el('g', { id: `vert-${v.id}` }));
+    const grp = append(g, el('g'));
     grp.style.cursor = 'pointer';
-    grp.style.touchAction = 'manipulation';
     append(grp, el('circle', { cx:v.cx, cy:v.cy, r:v.r+10, fill:'none', stroke:v.fill, 'stroke-width':1, 'stroke-opacity':0.25 }));
     append(grp, el('circle', { cx:v.cx, cy:v.cy, r:v.r, fill:v.fill, stroke:v.fill, 'stroke-width':2 }));
     append(grp, el('text', {
@@ -394,7 +521,7 @@ function drawVerticals() {
     vertEls[v.id] = grp;
     grp.addEventListener('mouseenter', () => { if (!locked) applyHighlight('vert', v.id); });
     grp.addEventListener('mouseleave', () => { if (!locked) resetHighlight(); });
-    grp.addEventListener('click',      () => lockToggle('vert', v.id));
+    grp.addEventListener('click',      () => { if (!pan?.moved) lockToggle('vert', v.id); });
   });
 }
 
@@ -402,11 +529,10 @@ function drawVerticals() {
 const popEls = {};
 
 function drawPopulations() {
-  const g = append(svg, el('g', { id: 'pop-layer' }));
+  const g = append(svg, el('g'));
   POPS.forEach(p => {
-    const grp = append(g, el('g', { id:`pop-${p.id}` }));
+    const grp = append(g, el('g'));
     grp.style.cursor = 'pointer';
-    grp.style.touchAction = 'manipulation';
     append(grp, el('circle', { cx:p.cx, cy:p.cy, r:p.r, fill:'#1E1E1E', stroke:'#555', 'stroke-width':1.5 }));
     p.label.forEach((line, i) => {
       const off = p.label.length === 1 ? 0 : (i - (p.label.length-1)/2) * 13;
@@ -419,7 +545,7 @@ function drawPopulations() {
     popEls[p.id] = grp;
     grp.addEventListener('mouseenter', () => { if (!locked) applyHighlight('pop', p.id); });
     grp.addEventListener('mouseleave', () => { if (!locked) resetHighlight(); });
-    grp.addEventListener('click',      () => lockToggle('pop', p.id));
+    grp.addEventListener('click',      () => { if (!pan?.moved) lockToggle('pop', p.id); });
   });
 }
 
@@ -439,8 +565,7 @@ function applyHighlight(kind, id) {
     const active = kind === 'pop' ? c.fromId === id : c.toId === id;
     c.dimmed = !active;
     if (active) {
-      c._activeOpacity = 0.85;
-      c._activeWidth   = 2.0;
+      c._ao = 0.85; c._aw = 2.0;
       c.path.setAttribute('stroke-opacity', 0.85);
       c.path.setAttribute('stroke-width',   2.0);
       c.lblGrp.setAttribute('opacity', 1.0);
@@ -469,9 +594,7 @@ function applyHighlight(kind, id) {
 function resetHighlight() {
   hideTooltip();
   connEls.forEach(c => {
-    c.dimmed = false;
-    c._activeOpacity = 0.18;
-    c._activeWidth   = 1.5;
+    c.dimmed = false; c._ao = 0.18; c._aw = 1.5;
     c.path.setAttribute('stroke-opacity', 0.18);
     c.path.setAttribute('stroke-width',   1.5);
     c.lblGrp.setAttribute('opacity', 0.82);
@@ -481,19 +604,18 @@ function resetHighlight() {
   VERTS.forEach(v => { vertEls[v.id].style.opacity = 1; });
 }
 
-// Tap outside nodes/paths on mobile to deselect
-svg.addEventListener('touchstart', e => {
-  if (locked && !e.target.closest('#vert-layer, #pop-layer, #conn-layer')) {
-    locked = null; resetHighlight();
-  }
-}, { passive: true });
+// ── Detect touch device and update hint ───────────────────────────
+if (window.matchMedia('(pointer: coarse)').matches) {
+  document.getElementById('hint').textContent =
+    'Tap any node · pinch to zoom · tap a line to read it';
+}
 
 // ── Init ──────────────────────────────────────────────────────────
-drawDefs();
 drawBackground();
 drawConnections();
 drawVerticals();
 drawPopulations();
+applyVB();
 </script>
 </body>
 </html>
